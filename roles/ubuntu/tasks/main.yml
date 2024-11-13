@@ -1,0 +1,46 @@
+---
+- name: Start the Docker Service in Ubuntu
+  tags: prep
+  become: true
+  service:
+    name: docker
+    state: started
+    enabled: true
+
+- name: Ensure group docker exists
+  tags: prep
+  become: true
+  group:
+    name: docker
+    state: present
+
+- name: Adding the current user to the docker group
+  tags: prep
+  user:
+    name: "{{ ansible_user }}"
+    groups: docker
+    append: yes
+
+- name: Create a docker directory
+  file:
+    path: /home/qadjuanson/docker_files
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '777'
+
+- name: Copy Dockerfile to Ubuntu
+  become: true
+  copy:
+    src: /home/qadjuanson/HOA11/Docker/Dockerfile
+    dest: /home/qadjuanson/docker_files
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '777'
+- name: Build Docker Image
+  become: true
+  docker_image:
+    path: /home/qadjuanson/docker_files/
+    name: docker-image-apache-mariadb
+    tag: latest
+    state: present

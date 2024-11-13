@@ -1,0 +1,99 @@
+---
+- name: Install Docker and setup Dockerfile
+  hosts: all
+  become: yes
+
+  tasks:
+    - name: Install prerequisites
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - software-properties-common
+          - python3-pip
+          - python3
+        state: present
+
+    - name: Install Docker Python library
+      pip:
+        name: docker
+        state: present
+
+    - name: Install Docker Python libraries
+      apt:
+        name: python3-docker
+        state: present
+
+    - name: Add Docker’s official GPG key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    - name: Add Docker repository
+      apt_repository:
+        repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu bionic stable
+        state: present
+
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+
+    - name: Install Docker
+      apt:
+        name: docker-ce
+        state: latest
+
+    - name: Ensure Docker service is running
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Add user to Docker group
+      user:
+        name: "{{ ansible_user }}"
+        group: docker
+        append: yes
+
+    - name: Create Dockerfile for Apache and MariaDB
+      copy:
+        dest: /home/{{ ansible_user }}/Dockerfile
+        content: |
+          FROM ubuntu:18.04
+
+          # Install dependencies
+          RUN apt-get update && apt-get install -y \
+              apache2 \
+              mariadb-server \
+              && apt-get clean \
+              && rm -rf /var/lib/apt/lists/*
+
+          # Enable Apache mods
+          RUN a2enmod rewrite
+
+          # Copy a simple index.html file
+          COPY index.html /var/www/html/index.html
+
+          # Start services
+          CMD service apache2 start && service mysql start && tail -f /dev/null
+
+    - name: Create simple index.html
+      copy:
+        dest: /home/{{ ansible_user }}/index.html
+        content: |
+          <html>
+          <head>
+              <title>Welcome</title>
+          </head>
+          <body>
+              <h1>Welcome to Apache & MariaDB Docker Setup on Ubuntu 18.04</h1>
+          </body>
+          </html>
+
+    - name: Build Docker image
+      docker_image:
+        path: /home/{{ ansible_user }}
+        name: apache_mariadb_image
+        tag: latest
+        state: present
